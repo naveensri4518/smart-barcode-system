@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
-import { Bell } from 'lucide-react'
+import { Bell, Moon, Sun } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 import { toast } from 'react-hot-toast'
 
 const pageTitles = {
@@ -18,7 +19,8 @@ const pageTitles = {
 export default function TopBar() {
   const location = useLocation()
   const { user } = useAuth()
-  const page = pageTitles[location.pathname] || { title: 'SmartBarcode', subtitle: '' }
+  const { theme, toggleTheme } = useTheme()
+  const page = pageTitles[location.pathname] || { title: 'Dashboard', subtitle: '' }
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -33,6 +35,13 @@ export default function TopBar() {
         <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{dateStr}</p>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button 
+          className="btn-icon btn-secondary" 
+          aria-label="Toggle Theme"
+          onClick={toggleTheme}
+        >
+          {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+        </button>
         <button 
           className="btn-icon btn-secondary" 
           aria-label="Notifications"

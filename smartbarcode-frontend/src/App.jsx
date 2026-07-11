@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { CartProvider } from './context/CartContext'
 import ProtectedRoute from './router/ProtectedRoute'
 import AdminRoute from './router/AdminRoute'
@@ -21,6 +22,7 @@ import ShiftSummary from './pages/staff/ShiftSummary'
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <CartProvider>
         <Routes>
@@ -45,5 +47,6 @@ export default function App() {
         </Routes>
       </CartProvider>
     </AuthProvider>
+    </ThemeProvider>
   )
 }

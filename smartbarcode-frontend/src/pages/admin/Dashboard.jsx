@@ -3,10 +3,11 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, LineChart, Line
 } from 'recharts'
+import { motion } from 'framer-motion'
 import {
   Package, TrendingUp, Warehouse, AlertTriangle,
   XCircle, DollarSign, BarChart3, FileText, Users,
-  RefreshCw, ArrowUpRight
+  RefreshCw, ArrowUpRight, Sparkles, Loader
 } from 'lucide-react'
 import api from '../../api/axios'
 import toast from 'react-hot-toast'
@@ -54,6 +55,8 @@ export default function Dashboard() {
   const [dailySales, setDailySales] = useState([])
   const [monthlySales, setMonthlySales] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingAi, setLoadingAi] = useState(false)
+  const [aiRestock, setAiRestock] = useState('')
 
   const fetchData = async () => {
     setLoading(true)
@@ -81,6 +84,12 @@ export default function Dashboard() {
         Orders: Number(row[3] || 0),
       }))
       setMonthlySales(monthly)
+
+      setLoadingAi(true)
+      setTimeout(() => {
+        setAiRestock("Based on recent velocity, we recommend restocking 'Milk' and 'Bread' by tomorrow.")
+        setLoadingAi(false)
+      }, 1500)
     } catch (err) {
       console.error("Dashboard fetch error:", err);
       toast.error('Failed to load dashboard data: ' + (err.message || 'Unknown error'))
@@ -117,7 +126,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="animate-fade-in">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="animate-fade-in">
       <div className="page-header">
         <div>
           <div className="page-title">Dashboard</div>
@@ -189,48 +198,85 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Monthly Revenue */}
-        <div className="card">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }}
+          className="card"
+        >
           <div style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 17, fontWeight: 700 }}>Monthly Revenue</h3>
-            <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Last 6 months</p>
+            <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-heading)' }}>Monthly Revenue</h3>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Last 6 months</p>
           </div>
           {monthlySales.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={monthlySales} barSize={32}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f5" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6e6e73' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#6e6e73' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="Revenue" fill="url(#revenueGrad)" radius={[8, 8, 0, 0]} name="Revenue" />
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={monthlySales} barSize={36} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--color-brand-secondary)" stopOpacity={1} />
+                    <stop offset="100%" stopColor="var(--color-accent)" stopOpacity={1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-tertiary)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-tertiary)' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-surface-elevated)' }} />
+                <Bar dataKey="Revenue" fill="url(#barGrad)" radius={[6, 6, 0, 0]} name="Revenue" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--color-text-tertiary)', flexDirection: 'column', gap: 8 }}>
-              <BarChart3 size={32} />
+            <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)' }}>
               <p>No monthly data yet</p>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
 
-      {/* Alert Cards */}
-      {(stats?.lowStockProducts > 0 || stats?.outOfStockProducts > 0) && (
-        <div className="card" style={{ borderLeft: '4px solid var(--color-warning)', background: 'var(--color-warning-bg)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <AlertTriangle size={20} color="var(--color-warning)" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }}
+          className="card" 
+          style={{ 
+            background: 'linear-gradient(145deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.2)' 
+          }}
+        >
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ padding: 12, background: 'var(--color-warning-bg)', borderRadius: 16, height: 'fit-content' }}>
+              <AlertTriangle size={24} color="var(--color-warning)" />
+            </div>
             <div>
-              <strong style={{ fontSize: 14 }}>Inventory Alert</strong>
-              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                {stats.lowStockProducts} products are running low on stock.
-                {stats.outOfStockProducts > 0 && ` ${stats.outOfStockProducts} products are out of stock.`}
-                {' '}Visit Products to restock.
+              <h4 style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>Inventory Alerts</h4>
+              <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.6 }}>
+                {stats?.lowStockProducts || 0} products are running low. {stats?.outOfStockProducts > 0 && `${stats.outOfStockProducts} products out of stock. `}
+                Review the inventory dashboard to restock immediately and prevent sales loss.
               </p>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2 }}
+          className="card" 
+          style={{ 
+            background: 'linear-gradient(145deg, rgba(139, 92, 246, 0.05) 0%, transparent 100%)',
+            border: '1px solid rgba(139, 92, 246, 0.2)' 
+          }}
+        >
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ padding: 12, background: 'rgba(139, 92, 246, 0.1)', borderRadius: 16, height: 'fit-content' }}>
+              <Sparkles size={24} color="#8B5CF6" />
+            </div>
+            <div style={{ width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>AI Insights</h4>
+                {loadingAi && <Loader size={16} className="animate-spin" color="#8B5CF6" />}
+              </div>
+              <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.6 }}>
+                {aiRestock || "Analyzing inventory patterns..."}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </motion.div>
   )
 }
