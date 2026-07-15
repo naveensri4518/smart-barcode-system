@@ -12,6 +12,7 @@ export default function InvoicePrint() {
   const currency = settings?.currency_symbol || '₹'
   const [invoice, setInvoice] = useState(null)
   const [localSettings, setLocalSettings] = useState(settings || {})
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
