@@ -6,6 +6,7 @@ import { SettingsProvider } from './context/SettingsContext'
 import ProtectedRoute from './router/ProtectedRoute'
 import AdminRoute from './router/AdminRoute'
 import Layout from './components/layout/Layout'
+import LandingPage from './pages/public/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import Dashboard from './pages/admin/Dashboard'
 import Products from './pages/admin/Products'
@@ -29,25 +30,26 @@ export default function App() {
       <SettingsProvider>
       <CartProvider>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
-            <Route path="products" element={<AdminRoute><Products /></AdminRoute>} />
-            <Route path="inventory" element={<AdminRoute><Inventory /></AdminRoute>} />
-            <Route path="staff" element={<AdminRoute><StaffManagement /></AdminRoute>} />
-            <Route path="invoices" element={<AdminRoute><InvoiceHistory /></AdminRoute>} />
-            <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
-            <Route path="settings" element={<AdminRoute><Settings /></AdminRoute>} />
-            <Route path="audit-logs" element={<AdminRoute><AuditLogs /></AdminRoute>} />
-            <Route path="customers" element={<AdminRoute><Customers /></AdminRoute>} />
-            <Route path="billing" element={<BillingPage />} />
-            <Route path="price-check" element={<PriceCheck />} />
-            <Route path="returns" element={<Returns />} />
-            <Route path="shift-summary" element={<ShiftSummary />} />
-            <Route path="invoice/:id" element={<InvoicePrint />} />
+          
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            <Route path="/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
+            <Route path="/products" element={<AdminRoute><Products /></AdminRoute>} />
+            <Route path="/inventory" element={<AdminRoute><Inventory /></AdminRoute>} />
+            <Route path="/staff" element={<AdminRoute><StaffManagement /></AdminRoute>} />
+            <Route path="/invoices" element={<AdminRoute><InvoiceHistory /></AdminRoute>} />
+            <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+            <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
+            <Route path="/audit-logs" element={<AdminRoute><AuditLogs /></AdminRoute>} />
+            <Route path="/customers" element={<AdminRoute><Customers /></AdminRoute>} />
+            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/price-check" element={<PriceCheck />} />
+            <Route path="/returns" element={<Returns />} />
+            <Route path="/shift-summary" element={<ShiftSummary />} />
+            <Route path="/invoice/:id" element={<InvoicePrint />} />
           </Route>
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </CartProvider>
       </SettingsProvider>
