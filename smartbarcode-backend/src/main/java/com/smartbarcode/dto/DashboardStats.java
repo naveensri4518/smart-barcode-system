@@ -24,4 +24,5 @@ public class DashboardStats {
     private long totalInvoices;
     private long activeStaff;
     private Map<String, BigDecimal> staffSalesToday;
+    private java.util.List<com.smartbarcode.entity.Product> expiringProducts;
 }

@@ -1,13 +1,22 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { useSettings } from './SettingsContext'
 
 const CartContext = createContext(null)
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([])
   const [discount, setDiscount] = useState({ type: 'FLAT', value: 0 })
+  const { settings, loadingSettings } = useSettings()
   const [taxRate, setTaxRate] = useState(18)
+
+  useEffect(() => {
+    if (!loadingSettings && settings?.gst_rate) {
+      setTaxRate(Number(settings.gst_rate))
+    }
+  }, [settings, loadingSettings])
+
   const [paymentMethod, setPaymentMethod] = useState('CASH')
-  const [customer, setCustomer] = useState({ name: '', phone: '' })
+  const [customer, setCustomer] = useState({ name: '', phone: '', preference: 'SMS' })
   
   // Hold Bill State
   const [heldBills, setHeldBills] = useState([])
@@ -51,7 +60,7 @@ export function CartProvider({ children }) {
   const clearCart = useCallback(() => {
     setCart([])
     setDiscount({ type: 'FLAT', value: 0 })
-    setCustomer({ name: '', phone: '' })
+    setCustomer({ name: '', phone: '', preference: 'SMS' })
   }, [])
 
   const holdCart = useCallback(() => {

@@ -20,7 +20,8 @@ const adminNav = [
     { to: '/reports', icon: BarChart3, label: 'Reports' },
   ]},
   { label: 'Management', items: [
-    { to: '/staff', icon: Users, label: 'Staff' },
+    { to: '/customers', icon: Users, label: 'Customers' },
+    { to: '/staff', icon: ShieldCheck, label: 'Staff' },
     { to: '/audit-logs', icon: ClipboardList, label: 'Audit Logs' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ]},

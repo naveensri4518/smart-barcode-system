@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { FileText, DollarSign, CreditCard, Smartphone, Banknote, RefreshCcw } from 'lucide-react'
+import { useSettings } from '../../context/SettingsContext'
 import api from '../../api/axios'
 
 export default function ShiftSummary() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -24,7 +27,7 @@ export default function ShiftSummary() {
     fetchSummary()
   }, [])
 
-  const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmt = (n) => currency + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   if (loading && !summary) {
     return <div style={{ padding: 40, textAlign: 'center' }}>Loading summary...</div>

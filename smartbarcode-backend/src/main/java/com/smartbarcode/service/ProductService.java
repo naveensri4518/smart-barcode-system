@@ -75,6 +75,17 @@ public class ProductService {
     }
 
     @Transactional
+    public Product restock(Long id, int quantityToAdd, String username, Long userId) {
+        Product existing = getById(id);
+        int currentStock = existing.getCurrentStock() == null ? 0 : existing.getCurrentStock();
+        existing.setCurrentStock(currentStock + quantityToAdd);
+        Product saved = productRepository.save(existing);
+        auditLogService.log(userId, username, "PRODUCT_RESTOCKED", "PRODUCT", saved.getId().toString(),
+            "Product restocked: " + saved.getName() + " (Added " + quantityToAdd + ")");
+        return saved;
+    }
+
+    @Transactional
     public void delete(Long id, String username, Long userId) {
         Product product = getById(id);
         product.setActive(false);

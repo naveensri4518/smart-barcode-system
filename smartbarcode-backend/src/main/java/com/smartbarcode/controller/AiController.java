@@ -113,4 +113,36 @@ public class AiController {
         
         return ResponseEntity.ok(Map.of("response", response.trim()));
     }
+
+    @GetMapping("/predict-restock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> predictRestock() {
+        List<com.smartbarcode.entity.Product> lowStock = productRepository.findAll().stream()
+            .filter(p -> p.getCurrentStock() <= p.getMinStockLevel() + 5)
+            .collect(Collectors.toList());
+            
+        String items = lowStock.stream()
+            .map(p -> p.getName() + " (Stock: " + p.getCurrentStock() + ")")
+            .collect(Collectors.joining(", "));
+
+        if (items.isEmpty()) {
+            return ResponseEntity.ok(Map.of("recommendations", "No immediate restocks needed. Inventory is healthy."));
+        }
+
+        String systemPrompt = "You are an AI inventory predictor. Based on the following items running low on stock, predict exactly 3-5 items that the store should reorder immediately. Output ONLY a comma-separated list of product names, with no formatting or other text.";
+        String response = aiService.generateChatCompletion(systemPrompt, "Current Stock Data: " + items);
+
+        return ResponseEntity.ok(Map.of("recommendations", response.trim()));
+    }
+
+    @PostMapping("/lookup-barcode")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> lookupBarcode(@RequestBody Map<String, String> request) {
+        String barcode = request.get("barcode");
+        if (barcode == null || barcode.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        String response = aiService.lookupBarcode(barcode);
+        return ResponseEntity.ok(Map.of("response", response));
+    }
 }

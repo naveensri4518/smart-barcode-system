@@ -10,7 +10,8 @@ import {
   RefreshCw, ArrowUpRight, Sparkles, Loader
 } from 'lucide-react'
 import api from '../../api/axios'
-import toast from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
+import { useSettings } from '../../context/SettingsContext'
 
 function StatCard({ icon: Icon, label, value, color, bg, gradient, trend }) {
   const isGradient = !!gradient;
@@ -30,7 +31,7 @@ function StatCard({ icon: Icon, label, value, color, bg, gradient, trend }) {
   )
 }
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, currency }) => {
   if (active && payload?.length) {
     return (
       <div style={{
@@ -41,7 +42,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
         {payload.map((p, i) => (
           <p key={i} style={{ color: p.color }}>
-            {p.name}: {p.name === 'Revenue' ? '₹' + Number(p.value).toLocaleString() : p.value}
+            {p.name}: {p.name === 'Revenue' ? (currency || '₹') + Number(p.value).toLocaleString() : p.value}
           </p>
         ))}
       </div>
@@ -51,6 +52,8 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Dashboard() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [stats, setStats] = useState(null)
   const [dailySales, setDailySales] = useState([])
   const [monthlySales, setMonthlySales] = useState([])
@@ -85,11 +88,14 @@ export default function Dashboard() {
       }))
       setMonthlySales(monthly)
 
-      setLoadingAi(true)
-      setTimeout(() => {
-        setAiRestock("Based on recent velocity, we recommend restocking 'Milk' and 'Bread' by tomorrow.")
+      api.get('/dashboard/predictions').then(res => {
+        setAiRestock(res.data.prediction)
         setLoadingAi(false)
-      }, 1500)
+      }).catch(err => {
+        console.error("Failed to load AI predictions:", err)
+        setAiRestock("Unable to generate AI insights at this time.")
+        setLoadingAi(false)
+      })
     } catch (err) {
       console.error("Dashboard fetch error:", err);
       toast.error('Failed to load dashboard data: ' + (err.message || 'Unknown error'))
@@ -101,7 +107,7 @@ export default function Dashboard() {
   useEffect(() => { fetchData() }, [])
 
   const fmt = (n) => n !== undefined && n !== null ? Number(n).toLocaleString('en-IN') : '—'
-  const fmtCurrency = (n) => n !== undefined && n !== null ? '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '₹0'
+  const fmtCurrency = (n) => n !== undefined && n !== null ? currency + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : currency + '0'
 
   if (loading) {
     return (
@@ -137,6 +143,74 @@ export default function Dashboard() {
         </button>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginBottom: 24 }}>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="card" 
+          style={{ 
+            background: 'linear-gradient(145deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.2)' 
+          }}
+        >
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ padding: 12, background: 'var(--color-warning-bg)', borderRadius: 16, height: 'fit-content' }}>
+              <AlertTriangle size={24} color="var(--color-warning)" />
+            </div>
+            <div>
+              <h4 style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>Inventory Alerts</h4>
+              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.5 }}>
+                {stats?.lowStockProducts || 0} products are running low. {stats?.outOfStockProducts > 0 && `${stats.outOfStockProducts} products out of stock. `}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="card" 
+          style={{ 
+            background: 'linear-gradient(145deg, rgba(239, 68, 68, 0.05) 0%, transparent 100%)',
+            border: '1px solid rgba(239, 68, 68, 0.2)' 
+          }}
+        >
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ padding: 12, background: 'var(--color-danger-bg)', borderRadius: 16, height: 'fit-content' }}>
+              <XCircle size={24} color="var(--color-danger)" />
+            </div>
+            <div>
+              <h4 style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>Expiring Soon</h4>
+              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.5 }}>
+                {stats?.expiringProducts?.length || 0} products expiring in the next 30 days. Action required to prevent loss.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="card" 
+          style={{ 
+            background: 'linear-gradient(145deg, rgba(139, 92, 246, 0.05) 0%, transparent 100%)',
+            border: '1px solid rgba(139, 92, 246, 0.2)' 
+          }}
+        >
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ padding: 12, background: 'rgba(139, 92, 246, 0.1)', borderRadius: 16, height: 'fit-content' }}>
+              <Sparkles size={24} color="#8B5CF6" />
+            </div>
+            <div style={{ width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>AI Insights</h4>
+                {loadingAi && <Loader size={16} className="animate-spin" color="#8B5CF6" />}
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.5 }}>
+                {aiRestock || "Analyzing inventory patterns..."}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
       {/* Stats Grid */}
       <div className="stats-grid">
         <StatCard icon={DollarSign} label="Today's Revenue" value={fmtCurrency(stats?.todayRevenue)}
@@ -150,9 +224,9 @@ export default function Dashboard() {
           color="var(--color-accent)" bg="var(--color-accent-light)" />
         <StatCard icon={Warehouse} label="Total Stock" value={fmt(stats?.totalStock)}
           color="var(--color-success)" bg="var(--color-success-bg)" />
-        <StatCard icon={AlertTriangle} label="Low Stock" value={fmt(stats?.lowStockProducts)}
+        <StatCard icon={AlertTriangle} label="Low Stock Products" value={fmt(stats?.lowStockProducts)}
           color="var(--color-warning)" bg="var(--color-warning-bg)" />
-        <StatCard icon={XCircle} label="Out of Stock" value={fmt(stats?.outOfStockProducts)}
+        <StatCard icon={XCircle} label="Out of Stock Products" value={fmt(stats?.outOfStockProducts)}
           color="var(--color-danger)" bg="var(--color-danger-bg)" />
         <StatCard icon={FileText} label="Total Invoices" value={fmt(stats?.totalInvoices)}
           color="#8b5cf6" bg="#f5f3ff" />
@@ -184,7 +258,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f5" />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6e6e73' }} />
                 <YAxis tick={{ fontSize: 11, fill: '#6e6e73' }} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip currency={currency} />} />
                 <Area type="monotone" dataKey="Revenue" stroke="var(--color-accent)" strokeWidth={3}
                   fill="url(#revenueGrad)" name="Revenue" activeDot={{ r: 6, fill: "var(--color-accent)", stroke: "white", strokeWidth: 2 }} />
               </AreaChart>
@@ -218,7 +292,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
                 <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-tertiary)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-tertiary)' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-surface-elevated)' }} />
+                <Tooltip content={<CustomTooltip currency={currency} />} cursor={{ fill: 'var(--color-surface-elevated)' }} />
                 <Bar dataKey="Revenue" fill="url(#barGrad)" radius={[6, 6, 0, 0]} name="Revenue" />
               </BarChart>
             </ResponsiveContainer>
@@ -230,53 +304,7 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }}
-          className="card" 
-          style={{ 
-            background: 'linear-gradient(145deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%)',
-            border: '1px solid rgba(245, 158, 11, 0.2)' 
-          }}
-        >
-          <div style={{ display: 'flex', gap: 16 }}>
-            <div style={{ padding: 12, background: 'var(--color-warning-bg)', borderRadius: 16, height: 'fit-content' }}>
-              <AlertTriangle size={24} color="var(--color-warning)" />
-            </div>
-            <div>
-              <h4 style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>Inventory Alerts</h4>
-              <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.6 }}>
-                {stats?.lowStockProducts || 0} products are running low. {stats?.outOfStockProducts > 0 && `${stats.outOfStockProducts} products out of stock. `}
-                Review the inventory dashboard to restock immediately and prevent sales loss.
-              </p>
-            </div>
-          </div>
-        </motion.div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2 }}
-          className="card" 
-          style={{ 
-            background: 'linear-gradient(145deg, rgba(139, 92, 246, 0.05) 0%, transparent 100%)',
-            border: '1px solid rgba(139, 92, 246, 0.2)' 
-          }}
-        >
-          <div style={{ display: 'flex', gap: 16 }}>
-            <div style={{ padding: 12, background: 'rgba(139, 92, 246, 0.1)', borderRadius: 16, height: 'fit-content' }}>
-              <Sparkles size={24} color="#8B5CF6" />
-            </div>
-            <div style={{ width: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>AI Insights</h4>
-                {loadingAi && <Loader size={16} className="animate-spin" color="#8B5CF6" />}
-              </div>
-              <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.6 }}>
-                {aiRestock || "Analyzing inventory patterns..."}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
     </motion.div>
   )
 }

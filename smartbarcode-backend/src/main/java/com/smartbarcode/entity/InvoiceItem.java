@@ -52,4 +52,11 @@ public class InvoiceItem {
 
     @Column(name = "tax_amount", precision = 12, scale = 2)
     private BigDecimal taxAmount;
+
+    @Column(name = "eco_saver_applied")
+    private Boolean ecoSaverApplied = false;
+    
+    @Column(name = "returned_quantity")
+    @Builder.Default
+    private Integer returnedQuantity = 0;
 }

@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react'
 import { AlertTriangle, XCircle, Clock, TrendingDown, Package } from 'lucide-react'
+import { useSettings } from '../../context/SettingsContext'
 import api from '../../api/axios'
 import toast from 'react-hot-toast'
 
 export default function Inventory() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [lowStock, setLowStock] = useState([])
   const [outOfStock, setOutOfStock] = useState([])
   const [expiring, setExpiring] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('low')
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -30,7 +34,7 @@ export default function Inventory() {
     fetchAll()
   }, [])
 
-  const fmtPrice = (n) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const fmtPrice = (n) => currency + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })
 
   const InventoryTable = ({ title, icon: Icon, items, color, bg, emptyMsg }) => (
     <div className="card" style={{ marginBottom: 24 }}>
@@ -122,23 +126,53 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards as Tabs */}
       <div className="stats-grid" style={{ marginBottom: 32 }}>
-        <div className="stat-card">
+        <div 
+          className="stat-card"
+          onClick={() => setActiveTab('low')}
+          style={{ 
+            cursor: 'pointer', 
+            border: activeTab === 'low' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+            boxShadow: activeTab === 'low' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+            transform: activeTab === 'low' ? 'translateY(-2px)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
           <div className="stat-icon" style={{ background: 'var(--color-warning-bg)' }}>
             <AlertTriangle size={20} color="var(--color-warning)" />
           </div>
           <div className="stat-value">{lowStock.length}</div>
           <div className="stat-label">Low Stock Products</div>
         </div>
-        <div className="stat-card">
+        <div 
+          className="stat-card"
+          onClick={() => setActiveTab('out')}
+          style={{ 
+            cursor: 'pointer', 
+            border: activeTab === 'out' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+            boxShadow: activeTab === 'out' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+            transform: activeTab === 'out' ? 'translateY(-2px)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
           <div className="stat-icon" style={{ background: 'var(--color-danger-bg)' }}>
             <XCircle size={20} color="var(--color-danger)" />
           </div>
           <div className="stat-value">{outOfStock.length}</div>
-          <div className="stat-label">Out of Stock</div>
+          <div className="stat-label">Out of Stock Products</div>
         </div>
-        <div className="stat-card">
+        <div 
+          className="stat-card"
+          onClick={() => setActiveTab('expiring')}
+          style={{ 
+            cursor: 'pointer', 
+            border: activeTab === 'expiring' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+            boxShadow: activeTab === 'expiring' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+            transform: activeTab === 'expiring' ? 'translateY(-2px)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
           <div className="stat-icon" style={{ background: '#fff8eb' }}>
             <Clock size={20} color="var(--color-warning)" />
           </div>
@@ -147,30 +181,79 @@ export default function Inventory() {
         </div>
       </div>
 
-      <InventoryTable
-        title="Low Stock Products"
-        icon={TrendingDown}
-        items={lowStock}
-        color="var(--color-warning)"
-        bg="var(--color-warning-bg)"
-        emptyMsg="All products are well stocked 🎉"
-      />
-      <InventoryTable
-        title="Out of Stock Products"
-        icon={XCircle}
-        items={outOfStock}
-        color="var(--color-danger)"
-        bg="var(--color-danger-bg)"
-        emptyMsg="No products are out of stock 🎉"
-      />
-      <InventoryTable
-        title="Expiring Products (Next 30 Days)"
-        icon={Clock}
-        items={expiring}
-        color="var(--color-warning)"
-        bg="var(--color-warning-bg)"
-        emptyMsg="No products expiring soon 🎉"
-      />
+      <div style={{ 
+        display: 'flex', 
+        width: '100%',
+        background: 'var(--color-surface)', 
+        padding: '6px', 
+        borderRadius: '16px', 
+        gap: '8px', 
+        marginBottom: '28px', 
+        border: '1px solid var(--color-border)',
+        boxShadow: 'var(--shadow-sm)'
+      }}>
+        {[
+          { id: 'low', label: 'Low Stock' },
+          { id: 'out', label: 'Out of Stock' },
+          { id: 'expiring', label: 'Expiring Soon' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              flex: 1,
+              padding: '12px 24px',
+              border: 'none',
+              background: activeTab === tab.id ? 'var(--color-bg)' : 'transparent',
+              color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: activeTab === tab.id ? 700 : 500,
+              cursor: 'pointer',
+              fontSize: '15px',
+              borderRadius: '10px',
+              boxShadow: activeTab === tab.id ? '0 2px 10px rgba(0,0,0,0.08)' : 'none',
+              transform: activeTab === tab.id ? 'scale(1.02)' : 'scale(1)',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              outline: 'none'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+
+      {activeTab === 'low' && (
+        <InventoryTable
+          title="Low Stock Products"
+          icon={TrendingDown}
+          items={lowStock}
+          color="var(--color-warning)"
+          bg="var(--color-warning-bg)"
+          emptyMsg="All products are well stocked 🎉"
+        />
+      )}
+      
+      {activeTab === 'out' && (
+        <InventoryTable
+          title="Out of Stock Products"
+          icon={XCircle}
+          items={outOfStock}
+          color="var(--color-danger)"
+          bg="var(--color-danger-bg)"
+          emptyMsg="No products are out of stock 🎉"
+        />
+      )}
+      
+      {activeTab === 'expiring' && (
+        <InventoryTable
+          title="Expiring Products (Next 30 Days)"
+          icon={Clock}
+          items={expiring}
+          color="var(--color-warning)"
+          bg="var(--color-warning-bg)"
+          emptyMsg="No products expiring soon 🎉"
+        />
+      )}
     </div>
   )
 }

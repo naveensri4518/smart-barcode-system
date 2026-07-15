@@ -21,7 +21,7 @@ public class GeminiAiService {
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
+    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=";
 
     @Value("${gemini.api.key:}")
     private String apiKey;
@@ -74,5 +74,33 @@ public class GeminiAiService {
             log.error("Failed to generate chat completion", e);
             throw new RuntimeException("AI processing failed", e);
         }
+    }
+
+    public String getProductRecommendations(List<String> cartItems) {
+        String systemPrompt = "You are an AI upsell assistant for a retail store. " +
+            "Given a list of items currently in a customer's cart, suggest exactly 1 complementary product they might also want to buy. " +
+            "Return ONLY the name of the product, with no other text.";
+        return generateChatCompletion(systemPrompt, "Cart Items: " + String.join(", ", cartItems));
+    }
+
+    public String lookupBarcode(String barcode) {
+        String systemPrompt = "You are an AI product catalog assistant. " +
+            "Given a barcode (EAN/UPC), try to guess the most likely Product Name, Brand, and Category for a typical Indian supermarket. " +
+            "If you do not know, make a highly plausible guess based on common FMCG goods. " +
+            "Return the output STRICTLY as a JSON object with keys: 'name', 'brand', 'category'. " +
+            "Do not return any markdown blocks or extra text.";
+        String res = generateChatCompletion(systemPrompt, "Barcode: " + barcode);
+        
+        // Clean up potential markdown formatting from Gemini
+        if (res.startsWith("```json")) {
+            res = res.substring(7);
+        }
+        if (res.startsWith("```")) {
+            res = res.substring(3);
+        }
+        if (res.endsWith("```")) {
+            res = res.substring(0, res.length() - 3);
+        }
+        return res.trim();
     }
 }

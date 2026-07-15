@@ -18,4 +18,10 @@ public interface InvoiceItemRepository extends JpaRepository<InvoiceItem, Long> 
            "GROUP BY ii.product.id, ii.product.name " +
            "ORDER BY totalQty DESC")
     List<Object[]> findTopSellingProducts(@Param("startDate") LocalDateTime startDate, org.springframework.data.domain.Pageable pageable);
+
+    @Query("SELECT ii.product.id, ii.product.name, ii.product.currentStock, SUM(ii.quantity) as totalQty " +
+           "FROM InvoiceItem ii JOIN ii.invoice i " +
+           "WHERE i.status = 'COMPLETED' AND i.createdAt >= :startDate " +
+           "GROUP BY ii.product.id, ii.product.name, ii.product.currentStock")
+    List<Object[]> getProductSalesVelocity(@Param("startDate") LocalDateTime startDate);
 }

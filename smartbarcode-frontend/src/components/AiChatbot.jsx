@@ -91,7 +91,7 @@ export default function AiChatbot() {
           <div key={i} style={{
             alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
             maxWidth: '85%', padding: '10px 14px', borderRadius: 12,
-            background: msg.role === 'user' ? 'var(--color-accent)' : 'white',
+            background: msg.role === 'user' ? 'var(--color-accent)' : 'var(--color-surface)',
             color: msg.role === 'user' ? 'white' : 'var(--color-text-primary)',
             border: msg.role === 'user' ? 'none' : '1px solid var(--color-border-light)',
             fontSize: 14, lineHeight: 1.4, whiteSpace: 'pre-wrap'
@@ -100,7 +100,7 @@ export default function AiChatbot() {
           </div>
         ))}
         {loading && (
-          <div style={{ alignSelf: 'flex-start', padding: '10px 14px', borderRadius: 12, background: 'white', border: '1px solid var(--color-border-light)' }}>
+          <div style={{ alignSelf: 'flex-start', padding: '10px 14px', borderRadius: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border-light)' }}>
             <Loader size={16} className="animate-spin" color="var(--color-accent)" />
           </div>
         )}

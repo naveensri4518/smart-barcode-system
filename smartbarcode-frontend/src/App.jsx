@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { CartProvider } from './context/CartContext'
+import { SettingsProvider } from './context/SettingsContext'
 import ProtectedRoute from './router/ProtectedRoute'
 import AdminRoute from './router/AdminRoute'
 import Layout from './components/layout/Layout'
@@ -14,6 +15,7 @@ import InvoiceHistory from './pages/admin/InvoiceHistory'
 import Reports from './pages/admin/Reports'
 import Settings from './pages/admin/Settings'
 import AuditLogs from './pages/admin/AuditLogs'
+import Customers from './pages/admin/Customers'
 import BillingPage from './pages/staff/BillingPage'
 import InvoicePrint from './pages/staff/InvoicePrint'
 import PriceCheck from './pages/staff/PriceCheck'
@@ -24,6 +26,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
+      <SettingsProvider>
       <CartProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -37,6 +40,7 @@ export default function App() {
             <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
             <Route path="settings" element={<AdminRoute><Settings /></AdminRoute>} />
             <Route path="audit-logs" element={<AdminRoute><AuditLogs /></AdminRoute>} />
+            <Route path="customers" element={<AdminRoute><Customers /></AdminRoute>} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="price-check" element={<PriceCheck />} />
             <Route path="returns" element={<Returns />} />
@@ -46,6 +50,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </CartProvider>
+      </SettingsProvider>
     </AuthProvider>
     </ThemeProvider>
   )

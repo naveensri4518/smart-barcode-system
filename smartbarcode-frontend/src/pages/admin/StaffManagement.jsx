@@ -117,9 +117,12 @@ function StaffModal({ staff, onClose, onSave }) {
                   />
                 </div>
                 {timeLeft > 0 ? (
-                  <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>
-                    OTP expires in {formatTime(timeLeft)}
-                  </p>
+                  <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>
+                    <p>OTP expires in {formatTime(timeLeft)}</p>
+                    <p style={{ marginTop: 12 }}>
+                      Didn't receive it? <a href="#" style={{ color: 'var(--color-accent)', fontWeight: 600, textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); handleSendOtp(); }}>Resend OTP</a>
+                    </p>
+                  </div>
                 ) : (
                   <p style={{ fontSize: 13, color: 'var(--color-danger)' }}>
                     OTP has expired. <a href="#" onClick={(e) => { e.preventDefault(); handleSendOtp(); }}>Resend OTP</a>

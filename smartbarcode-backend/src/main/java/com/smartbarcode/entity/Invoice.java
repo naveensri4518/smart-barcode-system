@@ -36,6 +36,11 @@ public class Invoice {
     @Column(name = "customer_phone", length = 15)
     private String customerPhone;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "customer_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Customer customer;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal = BigDecimal.ZERO;
 
@@ -56,13 +61,19 @@ public class Invoice {
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
     @Column(nullable = false, precision = 12, scale = 2)
+    @Builder.Default
     private BigDecimal total = BigDecimal.ZERO;
+    
+    @Column(name = "refunded_amount", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method")
     private PaymentMethod paymentMethod = PaymentMethod.CASH;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 50)
     private InvoiceStatus status = InvoiceStatus.COMPLETED;
 
     @Column(columnDefinition = "TEXT")
@@ -83,5 +94,5 @@ public class Invoice {
 
     public enum DiscountType { FLAT, PERCENTAGE }
     public enum PaymentMethod { CASH, CARD, UPI, OTHER }
-    public enum InvoiceStatus { COMPLETED, CANCELLED, REFUNDED }
+    public enum InvoiceStatus { COMPLETED, CANCELLED, REFUNDED, PARTIALLY_REFUNDED }
 }

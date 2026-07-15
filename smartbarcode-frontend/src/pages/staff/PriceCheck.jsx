@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, Package, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { useSettings } from '../../context/SettingsContext'
 import api from '../../api/axios'
 
 export default function PriceCheck() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [search, setSearch] = useState('')
@@ -58,7 +61,7 @@ export default function PriceCheck() {
     setPage(0)
   }
 
-  const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const fmt = (n) => currency + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
 
   return (
     <div style={{ padding: '32px', maxWidth: 1200, margin: '0 auto' }}>

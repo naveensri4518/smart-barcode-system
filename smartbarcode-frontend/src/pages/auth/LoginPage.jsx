@@ -217,7 +217,7 @@ export default function LoginPage() {
               }}>
                 <ScanBarcode size={24} color="white" strokeWidth={2.5} />
               </div>
-              <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.04em' }}>SmartBarcode</h1>
+              <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.04em' }}>Velora</h1>
             </div>
 
             {/* Main Content */}
@@ -249,7 +249,7 @@ export default function LoginPage() {
             {/* Footer Note */}
             <div>
               <p style={{ fontSize: 14, opacity: 0.7 }}>
-                © {new Date().getFullYear()} SmartBarcode Systems Inc.
+                © {new Date().getFullYear()} Velora Systems Inc.
               </p>
             </div>
           </div>

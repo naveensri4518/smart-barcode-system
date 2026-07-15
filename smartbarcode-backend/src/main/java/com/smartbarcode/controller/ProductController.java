@@ -57,6 +57,16 @@ public class ProductController {
         return ResponseEntity.ok(productService.update(id, data, auth.getName(), userId));
     }
 
+    @PostMapping("/{id}/restock")
+    public ResponseEntity<Product> restock(@PathVariable Long id, @RequestBody Map<String, Object> data, Authentication auth) {
+        Long userId = getUserId(auth);
+        int quantity = 0;
+        if (data != null && data.containsKey("quantity")) {
+            quantity = Integer.parseInt(data.get("quantity").toString());
+        }
+        return ResponseEntity.ok(productService.restock(id, quantity, auth.getName(), userId));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> delete(@PathVariable Long id, Authentication auth) {
         Long userId = getUserId(auth);

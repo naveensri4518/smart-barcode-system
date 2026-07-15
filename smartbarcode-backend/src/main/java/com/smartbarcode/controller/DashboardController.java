@@ -32,4 +32,9 @@ public class DashboardController {
     public ResponseEntity<List<Object[]>> getMonthlySales(@RequestParam(defaultValue = "12") int months) {
         return ResponseEntity.ok(dashboardService.getMonthlySales(months));
     }
+
+    @GetMapping("/predictions")
+    public ResponseEntity<Map<String, String>> getPredictions() {
+        return ResponseEntity.ok(dashboardService.getAiPrediction());
+    }
 }

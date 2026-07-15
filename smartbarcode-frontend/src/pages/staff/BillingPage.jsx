@@ -7,6 +7,7 @@ import { useCart } from '../../context/CartContext'
 import api from '../../api/axios'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import { useSettings } from '../../context/SettingsContext'
 
 // Camera Scanner using html5-qrcode (better for laptop webcams)
 function CameraScanner({ onDetect, onClose }) {
@@ -28,8 +29,10 @@ function CameraScanner({ onDetect, onClose }) {
             }
           },
           (decodedText) => {
-            if (scanner.isScanning) {
+            try {
               scanner.stop().then(() => onDetect(decodedText)).catch(() => onDetect(decodedText))
+            } catch (e) {
+              onDetect(decodedText)
             }
           },
           () => {} // Ignore frame errors
@@ -46,7 +49,7 @@ function CameraScanner({ onDetect, onClose }) {
     return () => {
       clearTimeout(timeout)
       try {
-        if (scanner && scanner.isScanning) scanner.stop()
+        if (scanner) scanner.stop().catch(() => {})
       } catch (e) {
         // ignore
       }
@@ -88,6 +91,8 @@ export default function BillingPage() {
     subtotal, discountAmount, taxAmount, total,
     heldBills, holdCart, resumeCart
   } = useCart()
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
 
   const [barcodeInput, setBarcodeInput] = useState('')
   const [scanning, setScanning] = useState(false)
@@ -102,8 +107,47 @@ export default function BillingPage() {
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const barcodeRef = useRef(null)
 
+  const [customerPoints, setCustomerPoints] = useState(0)
+  const [redeemPoints, setRedeemPoints] = useState(false)
+  const [isCustomerLoading, setIsCustomerLoading] = useState(false)
+
   const [aiRecommendations, setAiRecommendations] = useState([])
   const [loadingAi, setLoadingAi] = useState(false)
+
+  // OTP Verification States
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otpInput, setOtpInput] = useState('')
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
+
+  // Fetch customer points by phone
+  useEffect(() => {
+    if (customer.phone && customer.phone.length >= 10) {
+      const fetchCust = async () => {
+        try {
+          setIsCustomerLoading(true)
+          const res = await api.get(`/customers/phone/${customer.phone}`)
+          if (res.data) {
+            setCustomerPoints(res.data.loyaltyPoints || 0)
+            if (res.data.name && !customer.name) {
+              setCustomer(c => ({ ...c, name: res.data.name, preference: res.data.preferredNotification || 'SMS' }))
+            } else {
+              setCustomer(c => ({ ...c, preference: res.data.preferredNotification || 'SMS' }))
+            }
+          }
+        } catch (e) {
+          setCustomerPoints(0)
+          setRedeemPoints(false)
+        } finally {
+          setIsCustomerLoading(false)
+        }
+      }
+      const timeout = setTimeout(fetchCust, 500)
+      return () => clearTimeout(timeout)
+    } else {
+      setCustomerPoints(0)
+      setRedeemPoints(false)
+    }
+  }, [customer.phone])
 
   // Fetch AI Recommendations when cart changes
   useEffect(() => {
@@ -234,7 +278,40 @@ export default function BillingPage() {
     scanBarcode(barcode)
   }
 
-  const generateBill = async () => {
+  const checkCustomerAndGenerate = async () => {
+    if (cart.length === 0) { toast.error('Cart is empty'); return }
+    const phone = customer.phone?.trim();
+    const name = customer.name?.trim();
+
+    if (phone) {
+      if (!name) { toast.error('Customer name is required when entering a phone number'); return }
+      if (phone.length < 10) { toast.error('Please enter a valid phone number'); return }
+      
+      // Supermarket approach: skip OTP, instantly check out.
+      await executeCheckout()
+    } else {
+      // No phone provided, just generate bill without customer CRM
+      await executeCheckout()
+    }
+  }
+
+  const verifyOtpAndCheckout = async () => {
+    if (!otpInput) return;
+    setVerifyingOtp(true)
+    try {
+      await api.post('/customers/verify-otp', { phone: customer.phone, name: customer.name, otp: otpInput, preference: customer.preference })
+      toast.success('Customer Verified!')
+      setShowOtpModal(false)
+      setOtpInput('')
+      await executeCheckout()
+    } catch (e) {
+      toast.error('Invalid or Expired OTP')
+    } finally {
+      setVerifyingOtp(false)
+    }
+  }
+
+  const executeCheckout = async () => {
     if (cart.length === 0) { toast.error('Cart is empty'); return }
     setGenerating(true)
     try {
@@ -250,6 +327,7 @@ export default function BillingPage() {
         discountValue: Number(discount.value) || 0,
         taxRate: Number(taxRate),
         paymentMethod: paymentMethod,
+        redeemPoints: redeemPoints,
       }
       const res = await api.post('/invoices/generate', payload)
       setLastInvoice(res.data)
@@ -263,6 +341,9 @@ export default function BillingPage() {
   }
 
   const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  
+  const displayTotal = redeemPoints ? Math.max(0, total - customerPoints) : total
+  const pointsToEarn = Math.floor(displayTotal / 100);
 
   // Success screen after bill generation
   if (lastInvoice) {
@@ -289,7 +370,7 @@ export default function BillingPage() {
             </p>
           )}
           <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 8 }}>
-            ₹{fmt(lastInvoice.total)}
+            {currency}{fmt(lastInvoice.total)}
           </p>
           <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 28 }}>
             Payment: {lastInvoice.paymentMethod}
@@ -318,7 +399,7 @@ export default function BillingPage() {
       }}>
         {/* Header */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border-light)' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 2 }}>SmartBarcode POS</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 2 }}>Velora POS</h2>
           <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Scan or enter barcode to add products</p>
         </div>
 
@@ -387,7 +468,7 @@ export default function BillingPage() {
                           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{prod.barcode}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-accent)' }}>₹{fmt(prod.sellingPrice)}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-accent)' }}>{currency}{fmt(prod.sellingPrice)}</div>
                           <div style={{ fontSize: 11, color: prod.currentStock > 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
                             Stock: {prod.currentStock}
                           </div>
@@ -459,7 +540,7 @@ export default function BillingPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             <User size={13} color="var(--color-text-secondary)" />
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Customer (Optional)
+              Customer (Phone required for CRM)
             </span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -478,6 +559,30 @@ export default function BillingPage() {
               style={{ fontSize: 13, width: 130 }}
             />
           </div>
+          
+          {/* Notification preferences removed to simplify checkout (Supermarket Approach) */}
+
+          {customerPoints > 0 && (
+            <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--color-success-bg)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: 12, color: 'var(--color-success-text)', fontWeight: 600 }}>
+                  Loyalty Points: {customerPoints} ({currency}{customerPoints} value)
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--color-success-text)', opacity: 0.8, marginTop: 2 }}>
+                  Earn 1 pt per {currency}100 spent. 1 pt = {currency}1 discount.
+                </span>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600, color: 'var(--color-success-text)' }}>
+                <input type="checkbox" checked={redeemPoints} onChange={e => setRedeemPoints(e.target.checked)} />
+                Redeem Points
+              </label>
+            </div>
+          )}
+          {customerPoints === 0 && customer.phone && customer.phone.length >= 10 && (
+             <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+               Customer will earn 1 loyalty point for every {currency}100 spent.
+             </div>
+          )}
         </div>
 
         {/* AI Upsell Recommendations */}
@@ -525,7 +630,7 @@ export default function BillingPage() {
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 1 }}>{item.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{item.barcode}</div>
                   <div style={{ fontSize: 13, color: 'var(--color-accent)', fontWeight: 700, marginTop: 2 }}>
-                    ₹{fmt(item.unitPrice * item.quantity)}
+                    {currency}{fmt(item.unitPrice * item.quantity)}
                   </div>
                 </div>
                 {/* Quantity controls */}
@@ -598,7 +703,7 @@ export default function BillingPage() {
                     {item.name}
                     <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 400 }}> ×{item.quantity}</span>
                   </span>
-                  <span style={{ fontWeight: 600 }}>₹{fmt(item.unitPrice * item.quantity)}</span>
+                  <span style={{ fontWeight: 600 }}>{currency}{fmt(item.unitPrice * item.quantity)}</span>
                 </div>
               ))}
             </div>
@@ -617,7 +722,7 @@ export default function BillingPage() {
                 onChange={e => setDiscount(d => ({ ...d, type: e.target.value }))}
                 style={{ width: 150, fontSize: 13 }}
               >
-                <option value="FLAT">Flat (₹)</option>
+                <option value="FLAT">Flat ({currency})</option>
                 <option value="PERCENTAGE">Percentage (%)</option>
               </select>
               <input
@@ -633,7 +738,7 @@ export default function BillingPage() {
             </div>
             {discountAmount > 0 && (
               <p style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 8, fontWeight: 600 }}>
-                ✓ Discount of ₹{fmt(discountAmount)} will be applied
+                ✓ Discount of {currency}{fmt(discountAmount)} will be applied
               </p>
             )}
           </div>
@@ -669,25 +774,36 @@ export default function BillingPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                 <span style={{ color: 'var(--color-text-secondary)' }}>Subtotal</span>
-                <span>₹{fmt(subtotal)}</span>
+                <span>{currency}{fmt(subtotal)}</span>
               </div>
               {discountAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                   <span style={{ color: 'var(--color-success)' }}>
                     Discount {discount.type === 'PERCENTAGE' ? `(${discount.value}%)` : '(Flat)'}
                   </span>
-                  <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>−₹{fmt(discountAmount)}</span>
+                  <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>−{currency}{fmt(discountAmount)}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                 <span style={{ color: 'var(--color-text-secondary)' }}>Total GST</span>
-                <span>₹{fmt(taxAmount)}</span>
+                <span>{currency}{fmt(taxAmount)}</span>
               </div>
+              {redeemPoints && customerPoints > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'var(--color-success)' }}>Points Redemption</span>
+                  <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>−{currency}{fmt(Math.min(total, customerPoints))}</span>
+                </div>
+              )}
               <div style={{ height: 1, background: 'var(--color-border-light)', margin: '4px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 18, fontWeight: 800 }}>Total</span>
-                <span style={{ fontSize: 26, fontWeight: 900, color: 'var(--color-accent)' }}>₹{fmt(total)}</span>
+                <span style={{ fontSize: 26, fontWeight: 900, color: 'var(--color-accent)' }}>{currency}{fmt(displayTotal)}</span>
               </div>
+              {customer.phone && customer.phone.length >= 10 && (
+                 <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 12, color: 'var(--color-success)', fontWeight: 600, marginTop: -4 }}>
+                   + {pointsToEarn} Loyalty Points will be earned
+                 </div>
+              )}
             </div>
           </div>
         </div>
@@ -709,7 +825,7 @@ export default function BillingPage() {
             id="generate-bill-btn"
             className="btn btn-primary"
             style={{ flex: 1, justifyContent: 'center', padding: '15px', fontSize: 16, fontWeight: 700 }}
-            onClick={generateBill}
+            onClick={checkCustomerAndGenerate}
             disabled={cart.length === 0 || generating}
           >
             {generating ? (
@@ -718,7 +834,7 @@ export default function BillingPage() {
               </span>
             ) : (
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ScanBarcode size={18} /> Generate Bill · ₹{fmt(total)}
+                <ScanBarcode size={18} /> Generate Bill · {currency}{fmt(displayTotal)}
               </span>
             )}
           </button>
@@ -727,6 +843,46 @@ export default function BillingPage() {
 
       {showCamera && (
         <CameraScanner onDetect={handleCameraDetect} onClose={() => setShowCamera(false)} />
+      )}
+
+      {showOtpModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: 400, animation: 'slideUp 0.3s ease-out' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Verify New Customer</h3>
+            <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 20 }}>
+              We sent a 6-digit verification code to <strong>{customer.phone}</strong>. Please ask the customer for the OTP to register their account and apply their Welcome Bonus!
+            </p>
+            <input
+              type="text"
+              placeholder="Enter 6-digit OTP"
+              value={otpInput}
+              onChange={e => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              style={{ fontSize: 24, textAlign: 'center', letterSpacing: 8, padding: 16, marginBottom: 20, fontWeight: 700 }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ flex: 1, justifyContent: 'center' }} 
+                onClick={() => { setShowOtpModal(false); setOtpInput('') }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ flex: 1, justifyContent: 'center' }} 
+                onClick={verifyOtpAndCheckout}
+                disabled={otpInput.length < 6 || verifyingOtp}
+              >
+                {verifyingOtp ? <Loader size={16} className="animate-spin" /> : 'Verify & Checkout'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

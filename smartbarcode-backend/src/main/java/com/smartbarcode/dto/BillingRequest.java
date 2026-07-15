@@ -12,6 +12,7 @@ import java.util.List;
 public class BillingRequest {
     private String customerName;
     private String customerPhone;
+    private Boolean redeemPoints = false;
 
     @NotEmpty(message = "Cart items cannot be empty")
     private List<CartItem> items;

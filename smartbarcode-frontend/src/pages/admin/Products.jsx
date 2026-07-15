@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, Edit2, Trash2, Package, X, RefreshCw, Barcode as BarcodeIcon, Printer, Download, Upload, Sparkles, Loader } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Package, X, RefreshCw, Barcode as BarcodeIcon, Printer, Download, Upload, Sparkles, Loader, ScanBarcode } from 'lucide-react'
 import api from '../../api/axios'
 import toast from 'react-hot-toast'
 import Barcode from 'react-barcode'
+import { useSettings } from '../../context/SettingsContext'
 
 const EMPTY_PRODUCT = {
   barcode: '', name: '', brand: '', description: '',
@@ -30,7 +31,7 @@ function ImportModal({ onClose, onSave }) {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'smartbarcode_products_template.csv'
+    a.download = 'velora_products_template.csv'
     a.click()
     window.URL.revokeObjectURL(url)
   }
@@ -100,13 +101,109 @@ function ImportModal({ onClose, onSave }) {
   )
 }
 
-function ProductModal({ product, categories, suppliers, onClose, onSave }) {
+function QuickRestockModal({ product, onClose, onSave }) {
+  const [quantity, setQuantity] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!quantity || isNaN(quantity) || Number(quantity) <= 0) {
+      toast.error('Enter a valid quantity')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.post(`/products/${product.id}/restock`, { quantity: Number(quantity) })
+      toast.success(`Restocked ${product.name}!`)
+      onSave()
+    } catch (err) {
+      toast.error('Failed to restock')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 400 }}>
+        <div className="modal-header">
+          <h3>Quick Restock</h3>
+          <button type="button" className="btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div style={{ marginBottom: 16, padding: 12, background: 'var(--color-bg)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{product.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: 'monospace', marginTop: 4 }}>
+                {product.barcode}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 13 }}>
+                Current Stock: <span style={{ fontWeight: 700, color: 'var(--color-success)' }}>{product.currentStock} {product.unit}</span>
+              </div>
+            </div>
+            
+            <div className="form-group">
+              <label>Quantity to Add *</label>
+              <input 
+                type="number" 
+                autoFocus
+                value={quantity} 
+                onChange={e => setQuantity(e.target.value)} 
+                placeholder="e.g. 10" 
+                required 
+              />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Saving...' : 'Add Stock'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ProductModal({ product, autoLookup, categories, suppliers, onClose, onSave }) {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [form, setForm] = useState(product || EMPTY_PRODUCT)
   const [saving, setSaving] = useState(false)
   const [loadingAi, setLoadingAi] = useState(false)
   const isEdit = !!product?.id
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  useEffect(() => {
+    if (autoLookup && product?.barcode) {
+      handleAiLookup(product.barcode)
+    }
+  }, [autoLookup, product])
+
+  const handleAiLookup = async (barcode) => {
+    setLoadingAi(true)
+    try {
+      const res = await api.post('/ai/lookup-barcode', { barcode })
+      const aiData = JSON.parse(res.data.response)
+      
+      const updates = {}
+      if (aiData.name) updates.name = aiData.name
+      if (aiData.brand) updates.brand = aiData.brand
+      if (aiData.category) {
+        const match = categories.find(c => c.name.toLowerCase().includes(aiData.category.toLowerCase()) || aiData.category.toLowerCase().includes(c.name.toLowerCase()))
+        if (match) updates.categoryId = match.id
+      }
+      
+      setForm(f => ({ ...f, ...updates }))
+      toast.success('AI populated product details!')
+    } catch (err) {
+      toast.error("AI couldn't find barcode details, please enter manually")
+    } finally {
+      setLoadingAi(false)
+    }
+  }
 
   const handleAiCategorize = async () => {
     if (!form.name.trim()) {
@@ -211,12 +308,12 @@ function ProductModal({ product, categories, suppliers, onClose, onSave }) {
                 </select>
               </div>
               <div className="form-group">
-                <label>Purchase Price (₹) *</label>
+                <label>Purchase Price ({currency}) *</label>
                 <input type="number" step="0.01" value={form.purchasePrice}
                   onChange={e => set('purchasePrice', e.target.value)} placeholder="0.00" required />
               </div>
               <div className="form-group">
-                <label>Selling Price (₹) *</label>
+                <label>Selling Price ({currency}) *</label>
                 <input type="number" step="0.01" value={form.sellingPrice}
                   onChange={e => set('sellingPrice', e.target.value)} placeholder="0.00" required />
               </div>
@@ -265,6 +362,8 @@ function ProductModal({ product, categories, suppliers, onClose, onSave }) {
 }
 
 export default function Products() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [suppliers, setSuppliers] = useState([])
@@ -276,6 +375,31 @@ export default function Products() {
   const [importModal, setImportModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [barcodeModal, setBarcodeModal] = useState(null)
+  
+  const [quickRestockProduct, setQuickRestockProduct] = useState(null)
+  const [barcodeInput, setBarcodeInput] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const barcodeRef = useRef(null)
+
+  const handleBarcodeScan = async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const barcode = barcodeInput.trim()
+      if (!barcode) return
+      
+      setScanning(true)
+      try {
+        const res = await api.get(`/products/barcode/${encodeURIComponent(barcode)}`)
+        setQuickRestockProduct(res.data)
+        setBarcodeInput('')
+      } catch (err) {
+        setModal({ product: { ...EMPTY_PRODUCT, barcode }, autoLookup: true })
+        setBarcodeInput('')
+      } finally {
+        setScanning(false)
+      }
+    }
+  }
 
   const fetchData = useCallback(async (page = 0) => {
     setLoading(true)
@@ -314,7 +438,7 @@ export default function Products() {
     }
   }
 
-  const fmtPrice = (n) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const fmtPrice = (n) => currency + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })
 
   return (
     <div className="animate-fade-in">
@@ -335,10 +459,20 @@ export default function Products() {
 
       {/* Search & Filters */}
       <div className="search-bar">
-        <div className="search-input-wrapper" style={{ maxWidth: 360 }}>
+        <div className="search-input-wrapper" style={{ maxWidth: 280, border: '2px solid var(--color-accent-light)' }}>
+          <ScanBarcode size={16} color={scanning ? 'var(--color-accent)' : undefined} />
+          <input
+            ref={barcodeRef}
+            placeholder="Scan Barcode to Add/Restock"
+            value={barcodeInput}
+            onChange={e => setBarcodeInput(e.target.value)}
+            onKeyDown={handleBarcodeScan}
+          />
+        </div>
+        <div className="search-input-wrapper" style={{ maxWidth: 280 }}>
           <Search size={16} />
           <input
-            placeholder="Search by name, barcode, brand..."
+            placeholder="Search by name..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -453,10 +587,20 @@ export default function Products() {
       {modal !== null && (
         <ProductModal
           product={modal.product}
+          autoLookup={modal.autoLookup}
           categories={categories}
           suppliers={suppliers}
           onClose={() => setModal(null)}
           onSave={() => { setModal(null); fetchData() }}
+        />
+      )}
+
+      {/* Quick Restock Modal */}
+      {quickRestockProduct && (
+        <QuickRestockModal
+          product={quickRestockProduct}
+          onClose={() => setQuickRestockProduct(null)}
+          onSave={() => { setQuickRestockProduct(null); fetchData() }}
         />
       )}
 

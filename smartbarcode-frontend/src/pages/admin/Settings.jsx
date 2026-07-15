@@ -21,6 +21,9 @@ export default function Settings() {
   const [settings, setSettings] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [smsLogs, setSmsLogs] = useState([])
+  const [whatsappLogs, setWhatsappLogs] = useState([])
+  const [showLogs, setShowLogs] = useState(false)
 
   useEffect(() => {
     api.get('/settings').then(res => {
@@ -40,6 +43,28 @@ export default function Settings() {
       toast.success('Settings saved successfully')
     } catch { toast.error('Failed to save settings') }
     finally { setSaving(false) }
+  }
+
+  const loadLogs = async () => {
+    try {
+      const sms = await api.get('/notifications/sms-logs')
+      const wa = await api.get('/notifications/whatsapp-logs')
+      setSmsLogs(sms.data)
+      setWhatsappLogs(wa.data)
+      setShowLogs(true)
+    } catch {
+      toast.error('Failed to load logs')
+    }
+  }
+
+  const retryLog = async (type, id) => {
+    try {
+      await api.post(`/notifications/retry/${type}/${id}`)
+      toast.success('Retry triggered')
+      loadLogs()
+    } catch {
+      toast.error('Retry failed')
+    }
   }
 
   if (loading) return <div style={{ padding: 48, textAlign: 'center' }}><div className="loading-spinner" /></div>
@@ -71,20 +96,9 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Tax & Billing">
-        <Field label="GST Rate (%)" id="gst_rate" type="number" value={settings.gst_rate || '18'}
-          onChange={e => set('gst_rate', e.target.value)} placeholder="18" />
-        <Field label="Currency Symbol" id="currency_symbol" value={settings.currency_symbol || '₹'}
-          onChange={e => set('currency_symbol', e.target.value)} placeholder="₹" />
-        <Field label="Invoice Prefix" id="invoice_prefix" value={settings.invoice_prefix || 'INV'}
-          onChange={e => set('invoice_prefix', e.target.value)} placeholder="INV" />
-        <div className="form-group full">
-          <label>Invoice Footer Message</label>
-          <textarea value={settings.invoice_footer || ''} rows={2}
-            onChange={e => set('invoice_footer', e.target.value)}
-            placeholder="Thank you for shopping with us!" />
-        </div>
-      </Section>
+
+
+
 
       <Section title="System Preferences">
         <div className="form-group">
@@ -105,6 +119,53 @@ export default function Settings() {
           </select>
         </div>
       </Section>
+
+      {showLogs && (
+        <div className="modal-overlay" onClick={() => setShowLogs(false)}>
+          <div className="modal" style={{ maxWidth: 800 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Notification Logs</h3>
+              <button className="btn-icon btn-ghost" onClick={() => setShowLogs(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: 600, overflowY: 'auto' }}>
+              <h4>SMS Logs</h4>
+              <table className="table" style={{ width: '100%', marginBottom: 20 }}>
+                <thead><tr><th>Phone</th><th>Status</th><th>Invoice</th><th>API Response</th><th>Action</th></tr></thead>
+                <tbody>
+                  {smsLogs.map((l, i) => (
+                    <tr key={i}>
+                      <td>{l.phone}</td>
+                      <td>{l.status}</td>
+                      <td>{l.invoiceId}</td>
+                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.apiResponse}>{l.apiResponse || '-'}</td>
+                      <td>
+                        {l.status === 'FAILED' && <button className="btn btn-primary btn-sm" onClick={() => retryLog('sms', l.id)}>Retry</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <h4>WhatsApp Logs</h4>
+              <table className="table" style={{ width: '100%' }}>
+                <thead><tr><th>Phone</th><th>Status</th><th>Invoice</th><th>API Response</th><th>Action</th></tr></thead>
+                <tbody>
+                  {whatsappLogs.map((l, i) => (
+                    <tr key={i}>
+                      <td>{l.phone}</td>
+                      <td>{l.status}</td>
+                      <td>{l.invoiceId}</td>
+                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.apiResponse}>{l.apiResponse || '-'}</td>
+                      <td>
+                        {l.status === 'FAILED' && <button className="btn btn-primary btn-sm" onClick={() => retryLog('whatsapp', l.id)}>Retry</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

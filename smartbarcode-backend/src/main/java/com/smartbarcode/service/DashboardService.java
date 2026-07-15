@@ -2,6 +2,7 @@ package com.smartbarcode.service;
 
 import com.smartbarcode.dto.DashboardStats;
 import com.smartbarcode.entity.User;
+import com.smartbarcode.repository.InvoiceItemRepository;
 import com.smartbarcode.repository.InvoiceRepository;
 import com.smartbarcode.repository.ProductRepository;
 import com.smartbarcode.repository.UserRepository;
@@ -22,6 +23,7 @@ public class DashboardService {
 
     private final ProductRepository productRepository;
     private final InvoiceRepository invoiceRepository;
+    private final InvoiceItemRepository invoiceItemRepository;
     private final UserRepository userRepository;
 
     public DashboardStats getStats() {
@@ -47,6 +49,7 @@ public class DashboardService {
             .totalInvoices(invoiceRepository.countCompletedInvoices())
             .activeStaff(userRepository.countByRoleAndActiveTrue(User.Role.ROLE_STAFF))
             .staffSalesToday(staffSalesMap)
+            .expiringProducts(productRepository.findExpiringProducts(LocalDate.now().plusDays(30)))
             .build();
     }
 
@@ -58,5 +61,38 @@ public class DashboardService {
     public List<Object[]> getMonthlySales(int months) {
         LocalDateTime startDate = LocalDateTime.now().minusMonths(months);
         return invoiceRepository.getMonthlySalesReport(startDate);
+    }
+
+    public Map<String, String> getAiPrediction() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<Object[]> sales = invoiceItemRepository.getProductSalesVelocity(thirtyDaysAgo);
+        
+        java.util.List<String> depletionWarnings = new java.util.ArrayList<>();
+        
+        for(Object[] row : sales) {
+            String name = (String) row[1];
+            Integer currentStock = (Integer) row[2];
+            Long totalQtySold = (Long) row[3];
+            
+            if (currentStock == null) currentStock = 0;
+            if (totalQtySold == null) totalQtySold = 0L;
+            
+            double dailyVelocity = totalQtySold / 30.0;
+            if (dailyVelocity > 0) {
+                double daysToDepletion = currentStock / dailyVelocity;
+                if (daysToDepletion <= 7 && daysToDepletion >= 0) {
+                    depletionWarnings.add("'" + name + "' (in ~" + Math.round(daysToDepletion) + " days)");
+                }
+            }
+        }
+        
+        String message;
+        if (depletionWarnings.isEmpty()) {
+            message = "Based on recent velocity, inventory levels are optimal. No immediate restocks required.";
+        } else {
+            message = "Based on recent velocity, we recommend restocking " + String.join(", ", depletionWarnings) + ".";
+        }
+        
+        return Map.of("prediction", message);
     }
 }

@@ -1,55 +1,91 @@
 package com.smartbarcode.service;
 
+import com.smartbarcode.entity.OtpVerification;
+import com.smartbarcode.repository.OtpVerificationRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class OtpService {
 
-    private static class OtpData {
-        String otp;
-        LocalDateTime expiryTime;
-
-        OtpData(String otp, LocalDateTime expiryTime) {
-            this.otp = otp;
-            this.expiryTime = expiryTime;
-        }
-    }
-
-    // Stores email -> OtpData
-    private final Map<String, OtpData> otpCache = new ConcurrentHashMap<>();
+    private final OtpVerificationRepository otpRepository;
     private final Random random = new Random();
-    private static final int OTP_EXPIRY_MINUTES = 2;
+    private static final int OTP_EXPIRY_MINUTES = 5;
 
-    public String generateAndStoreOtp(String email) {
+    public String generateAndStoreOtp(String phoneOrEmail) {
         String otp = String.format("%06d", random.nextInt(1000000));
         LocalDateTime expiry = LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES);
-        otpCache.put(email, new OtpData(otp, expiry));
-        log.info("Generated OTP for {}: {} (Expires in {} minutes)", email, otp, OTP_EXPIRY_MINUTES);
-        return otp;
+        
+        OtpVerification verification = OtpVerification.builder()
+                .phone(phoneOrEmail)
+                .otpHash(hashOtp(otp))
+                .attemptCount(0)
+                .expiresAt(expiry)
+                .verified(false)
+                .build();
+                
+        otpRepository.save(verification);
+        return otp; // Return plain text ONCE for the Notification Service to send it
     }
 
-    public boolean verifyOtp(String email, String otpToVerify) {
-        OtpData data = otpCache.get(email);
-        if (data == null) {
+    public boolean verifyOtp(String phoneOrEmail, String otpToVerify) {
+        Optional<OtpVerification> optData = otpRepository.findTopByPhoneOrderByCreatedAtDesc(phoneOrEmail);
+        
+        if (optData.isEmpty()) {
             return false;
         }
 
-        if (LocalDateTime.now().isAfter(data.expiryTime)) {
-            otpCache.remove(email);
+        OtpVerification data = optData.get();
+        
+        if (data.getVerified()) {
+            return false; // Already verified
+        }
+
+        if (LocalDateTime.now().isAfter(data.getExpiresAt()) || data.getAttemptCount() >= 5) {
             return false;
         }
 
-        if (data.otp.equals(otpToVerify)) {
-            otpCache.remove(email); // Clear after successful verification
+        String hashedInput = hashOtp(otpToVerify);
+
+        if (data.getOtpHash().equals(hashedInput)) {
+            data.setVerified(true);
+            otpRepository.save(data);
             return true;
+        } else {
+            data.setAttemptCount(data.getAttemptCount() + 1);
+            if (data.getAttemptCount() >= 5) {
+                data.setExpiresAt(LocalDateTime.now()); // Invalidate
+            }
+            otpRepository.save(data);
+            return false;
         }
-        return false;
+    }
+
+    private String hashOtp(String plainOtp) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] encodedhash = digest.digest(plainOtp.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(2 * encodedhash.length);
+            for (byte b : encodedhash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not found", e);
+        }
     }
 }

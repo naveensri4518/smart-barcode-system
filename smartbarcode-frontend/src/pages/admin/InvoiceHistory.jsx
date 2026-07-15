@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Search, Eye, Download, FileText, Calendar } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useSettings } from '../../context/SettingsContext'
 import api from '../../api/axios'
 import toast from 'react-hot-toast'
 
 export default function InvoiceHistory() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [invoices, setInvoices] = useState([])
   const [pagination, setPagination] = useState({ page: 0, totalPages: 1 })
   const [search, setSearch] = useState('')
@@ -25,7 +28,7 @@ export default function InvoiceHistory() {
 
   useEffect(() => { fetchInvoices() }, [search])
 
-  const fmtCurrency = (n) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const fmtCurrency = (n) => currency + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const fmtDate = (d) => new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (

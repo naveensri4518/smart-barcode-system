@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Undo2, Search, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { useSettings } from '../../context/SettingsContext'
 import api from '../../api/axios'
 
 export default function Returns() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [invoice, setInvoice] = useState(null)
   const [error, setError] = useState('')
@@ -12,6 +15,9 @@ export default function Returns() {
   const [recentInvoices, setRecentInvoices] = useState([])
 
   const [showConfirm, setShowConfirm] = useState(false)
+  const [showItemConfirm, setShowItemConfirm] = useState(null)
+  const [returnQty, setReturnQty] = useState(1)
+  const [returnReason, setReturnReason] = useState('Customer Changed Mind')
 
   useEffect(() => {
     fetchRecent()
@@ -71,7 +77,44 @@ export default function Returns() {
     }
   }
 
-  const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const handleItemRefund = async () => {
+    if (!returnReason) {
+      setError('Please select a return reason')
+      return
+    }
+    
+    const maxQty = showItemConfirm.quantity - (showItemConfirm.returnedQuantity || 0)
+    const qty = Number(returnQty)
+    
+    if (!qty || qty < 1 || qty > maxQty) {
+      setError(`Quantity must be between 1 and ${maxQty}`)
+      return
+    }
+    
+    setRefunding(true)
+    setError('')
+    
+    try {
+      await api.post(`/invoices/${invoice.id}/refund-items`, {
+        items: [{
+          invoiceItemId: showItemConfirm.id,
+          quantity: returnQty,
+          reason: returnReason
+        }]
+      })
+      setSuccess(`Successfully returned ${returnQty}x ${showItemConfirm.productName}.`)
+      setShowItemConfirm(null)
+      fetchInvoiceDetails(invoice.invoiceNumber) // Refresh invoice to show updated status/qty
+    } catch (err) {
+      console.error("Refund API Error:", err, err.response?.data)
+      const errorStr = err.response?.data?.message || err.response?.data?.error || err.message || JSON.stringify(err)
+      setError(`Backend Error: ${errorStr}`)
+    } finally {
+      setRefunding(false)
+    }
+  }
+
+  const fmt = (n) => currency + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
 
   return (
     <div style={{ padding: '32px', maxWidth: 800, margin: '0 auto' }}>
@@ -96,8 +139,9 @@ export default function Returns() {
       </div>
 
       {error && (
-        <div style={{ padding: '24px', background: '#fee2e2', color: '#991b1b', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, fontSize: 16, fontWeight: 600, marginBottom: 32 }}>
-          <AlertCircle size={24} /> {error}
+        <div style={{ padding: '24px', background: '#fee2e2', color: '#991b1b', borderRadius: 12, display: 'flex', alignItems: 'flex-start', gap: 12, fontSize: 14, fontWeight: 500, marginBottom: 32, wordBreak: 'break-all' }}>
+          <AlertCircle size={24} style={{ flexShrink: 0 }} /> 
+          <div style={{ flex: 1 }}>{error}</div>
         </div>
       )}
 
@@ -171,20 +215,46 @@ export default function Returns() {
                 <th style={{ textAlign: 'center' }}>Qty</th>
                 <th style={{ textAlign: 'right' }}>Price</th>
                 <th style={{ textAlign: 'right' }}>Total</th>
+                <th style={{ textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {invoice.items?.map((item, idx) => (
+              {invoice.items?.map((item, idx) => {
+                const returned = item.returnedQuantity || 0
+                const available = item.quantity - returned
+                return (
                 <tr key={idx}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{item.productName}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{item.productBarcode}</div>
+                    {returned > 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--color-danger)', fontWeight: 600, marginTop: 4 }}>
+                        {returned} Returned
+                      </div>
+                    )}
                   </td>
                   <td style={{ textAlign: 'center' }}>{item.quantity}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(item.unitPrice)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(item.subtotal)}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    {available > 0 && invoice.status !== 'REFUNDED' ? (
+                      <button 
+                        className="btn btn-sm"
+                        style={{ background: '#fff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                        onClick={() => {
+                          setShowItemConfirm(item)
+                          setReturnQty(1)
+                          setReturnReason('Customer Changed Mind')
+                        }}
+                      >
+                        Return
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>-</span>
+                    )}
+                  </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
 
@@ -208,7 +278,7 @@ export default function Returns() {
           
           {showConfirm && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-              <div style={{ background: 'white', padding: '32px', borderRadius: '16px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+              <div style={{ background: 'var(--color-surface)', padding: '32px', borderRadius: '16px', maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <AlertCircle size={28} color="var(--color-danger)" />
                   <h3 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Confirm Refund</h3>
@@ -230,6 +300,66 @@ export default function Returns() {
                     style={{ background: 'var(--color-danger)', padding: '10px 24px' }}
                   >
                     Yes, Refund
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {showItemConfirm && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+              <div style={{ background: 'var(--color-surface)', padding: '32px', borderRadius: '16px', maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <Undo2 size={28} color="var(--color-warning)" />
+                  <h3 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Return Item</h3>
+                </div>
+                
+                {error && error.includes('Backend Error') && (
+                  <div style={{ padding: '12px', background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: 13, marginBottom: 16, wordBreak: 'break-all' }}>
+                    {error}
+                  </div>
+                )}
+
+                <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
+                  Returning <strong>{showItemConfirm.productName}</strong>.
+                </p>
+                
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label>Quantity to Return (Max {showItemConfirm.quantity - (showItemConfirm.returnedQuantity || 0)})</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max={showItemConfirm.quantity - (showItemConfirm.returnedQuantity || 0)} 
+                    value={returnQty}
+                    onChange={e => setReturnQty(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 24 }}>
+                  <label>Reason for Return</label>
+                  <select value={returnReason} onChange={e => setReturnReason(e.target.value)}>
+                    <option value="Customer Changed Mind">Customer Changed Mind</option>
+                    <option value="Damaged/Defective">Damaged/Defective (Do not restock)</option>
+                    <option value="Expired">Expired (Do not restock)</option>
+                    <option value="Wrong Item Billed">Wrong Item Billed</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button 
+                    className="btn" 
+                    onClick={() => setShowItemConfirm(null)}
+                    style={{ background: 'var(--color-border)', color: 'var(--color-text)', padding: '10px 24px' }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleItemRefund}
+                    style={{ background: 'var(--color-warning)', padding: '10px 24px' }}
+                    disabled={refunding}
+                  >
+                    {refunding ? 'Processing...' : 'Return Item'}
                   </button>
                 </div>
               </div>

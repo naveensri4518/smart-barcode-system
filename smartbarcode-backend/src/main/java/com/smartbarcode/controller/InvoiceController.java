@@ -50,8 +50,21 @@ public class InvoiceController {
         return ResponseEntity.ok(billingService.refundInvoice(id, auth.getName()));
     }
 
+    @PostMapping("/{id}/refund-items")
+    public ResponseEntity<Invoice> refundItems(@PathVariable Long id, @Valid @RequestBody com.smartbarcode.dto.RefundRequest request, Authentication auth) {
+        return ResponseEntity.ok(billingService.refundItems(id, auth.getName(), request));
+    }
+
     @GetMapping("/shift-summary")
     public ResponseEntity<Map<String, Object>> getShiftSummary(Authentication auth) {
         return ResponseEntity.ok(billingService.getShiftSummary(auth.getName()));
+    }
+
+    @GetMapping("/returns")
+    public ResponseEntity<java.util.List<com.smartbarcode.entity.ReturnLog>> getReturns(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate
+    ) {
+        return ResponseEntity.ok(billingService.getReturnLogs(startDate, endDate));
     }
 }

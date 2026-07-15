@@ -80,6 +80,10 @@ public class StaffController {
         User saved = userRepository.save(user);
         auditLogService.log(null, "admin", "STAFF_CREATED", "USER", saved.getId().toString(),
             "Staff created: " + saved.getFullName());
+            
+        // Send the welcome email with credentials
+        emailService.sendWelcomeEmail(request.getEmail(), request.getFullName(), request.getUsername(), request.getPassword());
+        
         return ResponseEntity.ok(saved);
     }
 

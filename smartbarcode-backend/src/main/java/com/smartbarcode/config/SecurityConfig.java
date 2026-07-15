@@ -55,7 +55,7 @@ public class SecurityConfig {
                 .requestMatchers("/billing/**").hasAnyRole("ADMIN", "STAFF")
                 .requestMatchers("/invoices/generate").hasAnyRole("ADMIN", "STAFF")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/invoices", "/invoices/**").hasAnyRole("ADMIN", "STAFF")
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/invoices/*/refund").hasAnyRole("ADMIN", "STAFF")
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/invoices/*/refund", "/invoices/*/refund-items").hasAnyRole("ADMIN", "STAFF")
                 .requestMatchers("/invoices/**").hasRole("ADMIN")
                 .requestMatchers("/categories/**").hasAnyRole("ADMIN", "STAFF")
                 .requestMatchers("/audit-logs/**").hasRole("ADMIN")

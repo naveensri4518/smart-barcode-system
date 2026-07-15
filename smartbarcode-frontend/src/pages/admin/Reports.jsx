@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { BarChart3, Download, TrendingUp } from 'lucide-react'
+import { useSettings } from '../../context/SettingsContext'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import * as XLSX from 'xlsx'
 import api from '../../api/axios'
 import toast from 'react-hot-toast'
 
 export default function Reports() {
+  const { settings } = useSettings()
+  const currency = settings?.currency_symbol || '₹'
   const [data, setData] = useState([])
   const [period, setPeriod] = useState('daily')
   const [loading, setLoading] = useState(false)
   const [lowStock, setLowStock] = useState([])
+  const [returnLogs, setReturnLogs] = useState([])
 
   const fetchReport = async () => {
     setLoading(true)
@@ -35,6 +39,9 @@ export default function Reports() {
 
       const lowRes = await api.get('/products/low-stock')
       setLowStock(lowRes.data || [])
+
+      const returnsRes = await api.get('/invoices/returns')
+      setReturnLogs(returnsRes.data || [])
     } catch { toast.error('Failed to load report') }
     finally { setLoading(false) }
   }
@@ -46,7 +53,7 @@ export default function Reports() {
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(data.map(d => ({
       'Period': d.label,
-      'Revenue (₹)': d.Revenue,
+      [`Revenue (${currency})`]: d.Revenue,
       'Orders': d.Orders,
     })))
     XLSX.utils.book_append_sheet(wb, ws, 'Sales Report')
@@ -60,7 +67,19 @@ export default function Reports() {
       })))
       XLSX.utils.book_append_sheet(wb, wsLow, 'Low Stock')
     }
-    XLSX.writeFile(wb, `SmartBarcode_Report_${new Date().toISOString().split('T')[0]}.xlsx`)
+    if (returnLogs.length > 0) {
+      const wsReturns = XLSX.utils.json_to_sheet(returnLogs.map(r => ({
+        'Date': new Date(r.createdAt).toLocaleString(),
+        'Invoice': r.invoice?.invoiceNumber,
+        'Product': r.product?.name,
+        'Qty': r.quantity,
+        'Refund Amount': r.refundAmount,
+        'Reason': r.reason,
+        'Processed By': r.createdBy?.fullName
+      })))
+      XLSX.utils.book_append_sheet(wb, wsReturns, 'Returns')
+    }
+    XLSX.writeFile(wb, `Velora_Report_${new Date().toISOString().split('T')[0]}.xlsx`)
     toast.success('Report exported to Excel')
   }
 
@@ -101,7 +120,7 @@ export default function Reports() {
           <div className="stat-icon" style={{ background: 'var(--color-accent-light)' }}>
             <TrendingUp size={20} color="var(--color-accent)" />
           </div>
-          <div className="stat-value">₹{totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</div>
+          <div className="stat-value">{currency}{totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</div>
           <div className="stat-label">Total Revenue</div>
         </div>
         <div className="stat-card">
@@ -115,7 +134,7 @@ export default function Reports() {
           <div className="stat-icon" style={{ background: '#fff8eb' }}>
             <TrendingUp size={20} color="var(--color-warning)" />
           </div>
-          <div className="stat-value">₹{avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+          <div className="stat-value">{currency}{avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
           <div className="stat-label">Avg Order Value</div>
         </div>
       </div>
@@ -137,7 +156,7 @@ export default function Reports() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f5" />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6e6e73' }} />
               <YAxis tick={{ fontSize: 11, fill: '#6e6e73' }} />
-              <Tooltip formatter={(val, name) => [name === 'Revenue' ? '₹' + val.toLocaleString('en-IN') : val, name]} />
+              <Tooltip formatter={(val, name) => [name === 'Revenue' ? currency + val.toLocaleString('en-IN') : val, name]} />
               <Bar dataKey="Revenue" fill="#0071e3" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -170,7 +189,54 @@ export default function Reports() {
                     <td style={{ color: 'var(--color-warning)', fontWeight: 600 }}>
                       {p.minStockLevel - p.currentStock} needed
                     </td>
-                    <td>₹{Number(p.sellingPrice).toFixed(2)}</td>
+                    <td>{currency}{Number(p.sellingPrice).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Returns Report */}
+      {returnLogs.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <h3 style={{ marginBottom: 16 }}>Return & Refund Logs</h3>
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Invoice</th>
+                  <th>Product</th>
+                  <th>Qty</th>
+                  <th>Refund Amount</th>
+                  <th>Reason</th>
+                  <th>Processed By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnLogs.map(log => (
+                  <tr key={log.id}>
+                    <td style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{log.invoice?.invoiceNumber}</td>
+                    <td style={{ fontWeight: 600 }}>{log.product?.name}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{log.quantity}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--color-danger)' }}>
+                      {currency}{Number(log.refundAmount).toFixed(2)}
+                    </td>
+                    <td>
+                      <span style={{ 
+                        padding: '4px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                        background: log.reason.includes('Damaged') || log.reason.includes('Expired') ? '#fee2e2' : '#f3f4f6',
+                        color: log.reason.includes('Damaged') || log.reason.includes('Expired') ? '#991b1b' : '#374151'
+                      }}>
+                        {log.reason}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 13 }}>{log.createdBy?.fullName}</td>
                   </tr>
                 ))}
               </tbody>
