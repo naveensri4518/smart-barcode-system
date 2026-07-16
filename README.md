@@ -90,3 +90,76 @@ The system uses a highly normalized relational database structure consisting of 
 Create a new MySQL database for the application:
 ```sql
 CREATE DATABASE smartbarcode_db;
+```
+
+### 2. Backend Setup
+1. Navigate to the backend directory:
+   ```bash
+   cd smartbarcode-backend
+   ```
+2. Configure Environment Variables. Ensure you have a `.env` file in the root of the backend directory with the following variables:
+   ```env
+   # Database Configuration
+   DB_PASSWORD=your_mysql_password
+   
+   # JWT Configuration (Use a strong secret key)
+   JWT_SECRET=supersecretkey12345supersecretkey12345
+   
+   # Email Configuration (If using email features like OTP)
+   MAIL_USERNAME=your_email@gmail.com
+   MAIL_PASSWORD=your_app_password
+   ```
+3. Install dependencies and run the server:
+   ```bash
+   mvn clean install
+   mvn spring-boot:run
+   ```
+   *The REST API will be available at `http://localhost:8080`*
+
+### 3. Frontend Setup
+1. Navigate to the frontend directory:
+   ```bash
+   cd smartbarcode-frontend
+   ```
+2. Install npm packages:
+   ```bash
+   npm install
+   ```
+3. Start the Vite development server:
+   ```bash
+   npm run dev
+   ```
+   *The application UI will be accessible at `http://localhost:5173`*
+
+---
+
+## 🔌 API Endpoints Reference
+
+The backend exposes secured RESTful endpoints. *(Requires `Authorization: Bearer <token>` for non-auth routes)*
+
+* **Auth:** `POST /api/auth/login`, `POST /api/auth/register`
+* **Products:** `GET /api/products`, `POST /api/products`, `GET /api/products/barcode/{code}`
+* **Invoices:** `POST /api/invoices`, `GET /api/invoices`, `GET /api/invoices/{id}`
+* **Dashboard:** `GET /api/analytics/summary`
+* **Users:** `GET /api/users`, `PUT /api/users/{id}/status`
+
+---
+
+## 🌍 Live Deployment & Hosting
+
+The application is deployed and hosted in the cloud for production use:
+
+* **Frontend Hosting (Vercel):**
+  The React frontend is automatically built and deployed via **Vercel**. It provides a fast, global CDN for the Single Page Application, ensuring minimal latency and quick load times.
+
+* **Backend API & Database Hosting (Railway):**
+  The Spring Boot REST API and the MySQL 8.0 Database are hosted on **Railway.app**. 
+  - **Spring Boot App:** Runs as a containerized web service ensuring high availability.
+  - **MySQL Database:** A managed Railway MySQL plugin instance that the backend securely connects to.
+
+*[(https://velora-commerce-intel-system-97gesdwfn-naveensri4518s-projects.vercel.app/)]*
+
+---
+
+## 📜 License & Acknowledgements
+This system was engineered as an Enterprise-grade Capstone Project to demonstrate modern full-stack development, POS system architecture, and secure enterprise patterns.
